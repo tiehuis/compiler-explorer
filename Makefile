@@ -17,7 +17,7 @@ endif
 endif
 
 .PHONY: clean run test run-amazon c-preload optional-haskell-support optional-d-support optional-rust-support optional-zig-support
-.PHONY: dist lint prereqs node_modules bower_modules
+.PHONY: dist lint prereqs node_modules bower_modules travis-dist
 prereqs: optional-haskell-support optional-d-support optional-rust-support optional-zig-support node_modules c-preload bower_modules
 
 GDC?=gdc
@@ -41,8 +41,9 @@ optional-haskell-support:
 endif
 
 ifneq "" "$(shell which cargo)"
-optional-rust-support:
-	cd rust && cargo build --release
+rust/bin/rustfilt: rust/src/main.rs rust/Cargo.lock rust/Cargo.toml
+	cd rust && cargo build --release && cargo install --root . --force && cargo clean
+optional-rust-support: rust/bin/rustfilt 
 else
 optional-rust-support:
 	@echo "Rust language support disabled"
@@ -96,6 +97,7 @@ dist: prereqs
 	rm -rf out/dist
 	$(NODE) ./node_modules/requirejs/bin/r.js -o app.build.js
 	# Move all assets to a versioned directory
+	echo $(HASH) > out/dist/git_hash
 	mkdir -p out/dist/v/$(HASH)
 	mv out/dist/main.js* out/dist/v/$(HASH)/
 	mv out/dist/explorer.css out/dist/v/$(HASH)/
@@ -111,6 +113,13 @@ dist: prereqs
 	    --source-map-url require.js.map \
 	    --source-map-root //v/$(HASH)/ext/requirejs \
 	    --prefix 6
+
+travis-dist: dist
+	tar --exclude './out/compilers' --exclude './.git' --exclude './static' --exclude './out/dist/ext' -Jcvf /tmp/ce-build.tar.xz . 
+	rm -rf out/dist-bin
+	mkdir -p out/dist-bin
+	mv /tmp/ce-build.tar.xz out/dist-bin/${TRAVIS_BUILD_NUMBER}.tar.xz
+	echo ${HASH} > out/dist-bin/${TRAVIS_BUILD_NUMBER}.txt
 
 c-preload:
 	$(MAKE) -C c-preload

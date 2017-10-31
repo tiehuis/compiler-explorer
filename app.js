@@ -52,10 +52,24 @@ var opts = nopt({
     'debug': [Boolean],
     'static': [String],
     'archivedVersions': [String],
-    'noRemoteFetch': [Boolean]
+    'noRemoteFetch': [Boolean],
+    'tmpDir': [String]
 });
 
 if (opts.debug) logger.level = 'debug';
+
+// AP: Detect if we're running under Windows Subsystem for Linux. Temporary modification
+// of process.env is allowed: https://nodejs.org/api/process.html#process_process_env
+if (child_process.execSync('uname -a').toString().indexOf('Microsoft') > -1)
+    process.env.wsl = true;
+
+// AP: Allow setting of tmpDir (used in lib/base-compiler.js & lib/exec.js) through
+// opts. WSL requires a tmpDir as it can't see Linux volumes so set default to c:\tmp.
+if (opts.tmpDir)
+    process.env.tmpDir = opts.tmpDir;
+else if (process.env.wsl)
+    process.env.tmpDir = "/mnt/c/tmp";
+
 
 // Set default values for omitted arguments
 var rootDir = opts.rootDir || './etc';
@@ -65,12 +79,18 @@ var hostname = opts.host;
 var port = opts.port || 10240;
 var staticDir = opts.static || 'static';
 var archivedVersions = opts.archivedVersions;
-var gitReleaseName = child_process.execSync('git rev-parse HEAD').toString().trim();
+var gitReleaseName = "";
 var versionedRootPrefix = "";
-// Don't treat @ in paths as remote adresses
-var fetchCompilersFromRemote = !opts.noRemoteFetch;
+// Use the canned git_hash if provided
+if (opts.static && fs.existsSync(opts.static + "/git_hash")) {
+    gitReleaseName = fs.readFileSync(opts.static + "/git_hash").toString().trim();
+} else {
+    gitReleaseName = child_process.execSync('git rev-parse HEAD').toString().trim();
+}
 if (opts.static && fs.existsSync(opts.static + '/v/' + gitReleaseName))
     versionedRootPrefix = "v/" + gitReleaseName + "/";
+// Don't treat @ in paths as remote adresses
+var fetchCompilersFromRemote = !opts.noRemoteFetch;
 
 var propHierarchy = _.flatten([
     'defaults',
@@ -482,6 +502,10 @@ function ApiHandler(compileHandler) {
     this.handler.post('/compiler/:compiler/compile', this.compileHandler.handler);
 }
 
+function healthcheckHandler(req, res, next) {
+    res.end("Everything is awesome");
+}
+
 function shortUrlHandler(req, res, next) {
     var bits = req.url.split("/");
     if (bits.length !== 2 || req.method !== "GET") return next();
@@ -576,6 +600,7 @@ findCompilers()
         webServer
             .set('trust proxy', true)
             .set('view engine', 'pug')
+            .use('/healthcheck', healthcheckHandler) // before morgan so healthchecks aren't logged
             .use(morgan('combined', {stream: logger.stream}))
             .use(compression())
             .get('/', function (req, res) {
