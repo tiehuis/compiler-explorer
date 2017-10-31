@@ -40,6 +40,7 @@ define(function (require) {
     require('./ispc-mode');
     require('./haskell-mode');
     require('./swift-mode');
+    require('./zig-mode');
 
     var loadSave = new loadSaveLib.LoadSave();
 

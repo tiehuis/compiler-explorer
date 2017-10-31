@@ -16,9 +16,9 @@ default: run
 endif
 endif
 
-.PHONY: clean run test run-amazon c-preload optional-haskell-support optional-d-support optional-rust-support
+.PHONY: clean run test run-amazon c-preload optional-haskell-support optional-d-support optional-rust-support optional-zig-support
 .PHONY: dist lint prereqs node_modules bower_modules
-prereqs: optional-haskell-support optional-d-support optional-rust-support node_modules c-preload bower_modules
+prereqs: optional-haskell-support optional-d-support optional-rust-support optional-zig-support node_modules c-preload bower_modules
 
 GDC?=gdc
 DMD?=dmd
@@ -46,6 +46,14 @@ optional-rust-support:
 else
 optional-rust-support:
 	@echo "Rust language support disabled"
+endif
+
+ifneq "" "$(shell which zig)"
+optional-zig-support:
+	cd zig
+else
+optional-zig-support:
+	@echo "Zig language support disabled"
 endif
 
 
