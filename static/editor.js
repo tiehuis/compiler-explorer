@@ -102,6 +102,10 @@ define(function (require) {
                 cmMode = "swift";
                 extensions = ['.swift'];
                 break;
+            case "zig":
+                cmMode = "zig";
+                extensions = ['.zig'];
+                break;
         }
 
         var root = this.domRoot.find(".monaco-placeholder");
